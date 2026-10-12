@@ -13,7 +13,11 @@ from app.retrieval.retriever import SemanticRetriever
 from app.retrieval.bm25_retriever import BM25Retriever
 from app.retrieval.hybrid_retriever import HybridRetriever
 from app.retrieval.reranker import CrossEncoderReranker
+import pytest
 
+@pytest.fixture
+def reranker():
+    return CrossEncoderReranker()
 
 def test_empty_and_sorting_logic(reranker: CrossEncoderReranker):
     print("--- Running Unit / Safety Tests ---")

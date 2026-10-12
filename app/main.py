@@ -16,17 +16,33 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Optional CORS middleware for local frontend/tools
+ALLOWED_ORIGINS = [
+    "https://policy-pilot-eta.vercel.app",
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://localhost:8000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:8000",
+]
+
+# Tightly constrained regex matching official project Vercel preview domains only
+# (e.g., https://policy-pilot-fullstack-*.vercel.app or https://policy-pilot-*.vercel.app)
+VERCEL_PREVIEW_ORIGIN_REGEX = r"^https://policy-pilot(-fullstack)?(-[a-zA-Z0-9_-]+)?\.vercel\.app$"
+
+# CORS middleware for Vercel production frontend, verified project previews, and local development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=VERCEL_PREVIEW_ORIGIN_REGEX,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
-# Register routes
+# Register routes for both root and /api prefixes
 app.include_router(router)
+app.include_router(router, prefix="/api")
 
 
 @app.get("/", include_in_schema=False)

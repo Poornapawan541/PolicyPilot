@@ -1,21 +1,33 @@
-from sentence_transformers import CrossEncoder
+import os
+from fastembed.rerank.cross_encoder import TextCrossEncoder
 
 
 class CrossEncoderReranker:
     """
-    Reranks candidate document chunks using a local Sentence Transformers Cross-Encoder model.
-    Evaluates (query, document) pairs directly with cross-attention to output relevance scores.
+    Reranks candidate document chunks using an ONNX-powered Cross-Encoder model via FastEmbed.
+    Evaluates (query, document) pairs directly to output relevance scores with low memory footprint.
+
+    Implements process-level model caching to guarantee that multiple instantiations
+    reuse the exact same underlying ONNX session without duplicating memory.
     """
+
+    _cached_model = None
+    _cached_model_name = None
 
     def __init__(
         self,
-        model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2",
+        model_name: str = "Xenova/ms-marco-MiniLM-L-6-v2",
     ):
         self.model_name = model_name
-        try:
-            self.model = CrossEncoder(model_name, local_files_only=True)
-        except Exception:
-            self.model = CrossEncoder(model_name)
+        cache_dir = os.getenv("FASTEMBED_CACHE_PATH")
+        if CrossEncoderReranker._cached_model is None or CrossEncoderReranker._cached_model_name != model_name:
+            CrossEncoderReranker._cached_model = TextCrossEncoder(
+                model_name=model_name,
+                cache_dir=cache_dir,
+                threads=1,
+            )
+            CrossEncoderReranker._cached_model_name = model_name
+        self.model = CrossEncoderReranker._cached_model
 
     def rerank(
         self,
@@ -48,21 +60,21 @@ class CrossEncoderReranker:
         if not unique_candidates:
             return []
 
-        # Build (query, chunk_text) pairs for CrossEncoder
-        pairs = []
+        # Build list of candidate texts for TextCrossEncoder
         valid_candidates = []
+        texts = []
         for cand in unique_candidates:
             text = cand.get("text", "")
             if not text:
                 continue
-            pairs.append([query, text])
+            texts.append(text)
             valid_candidates.append(cand)
 
-        if not pairs:
+        if not texts:
             return []
 
-        # Predict scores
-        scores = self.model.predict(pairs)
+        # Predict scores using FastEmbed TextCrossEncoder
+        scores = list(self.model.rerank(query, texts))
 
         # Attach rerank_score and copy
         reranked_results = []

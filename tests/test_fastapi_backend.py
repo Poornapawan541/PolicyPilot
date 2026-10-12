@@ -236,6 +236,59 @@ def test_model_reuse_across_requests():
     print("Passed Test 8: PipelineManager reuses compiled graph without reloading.")
 
 
+def test_cors_production_origin_allowed():
+    print("\n--- Test 9: CORS Production and Localhost Allowed ---")
+    headers = {
+        "Origin": "https://policy-pilot-eta.vercel.app",
+        "Access-Control-Request-Method": "POST",
+    }
+    response = client.options("/health", headers=headers)
+    assert response.status_code == 200
+    assert response.headers.get("access-control-allow-origin") == "https://policy-pilot-eta.vercel.app"
+
+    # Localhost origin check
+    lh_headers = {
+        "Origin": "http://localhost:5173",
+        "Access-Control-Request-Method": "POST",
+    }
+    lh_res = client.options("/health", headers=lh_headers)
+    assert lh_res.status_code == 200
+    assert lh_res.headers.get("access-control-allow-origin") == "http://localhost:5173"
+    print("Passed Test 9: Production origin and localhost correctly allowed.")
+
+
+def test_cors_preview_origin_allowed():
+    print("\n--- Test 10: CORS Tightly Constrained Preview Allowed ---")
+    preview_headers = {
+        "Origin": "https://policy-pilot-fullstack-5x4y9bbnm-skill-swap12.vercel.app",
+        "Access-Control-Request-Method": "POST",
+    }
+    response = client.options("/health", headers=preview_headers)
+    assert response.status_code == 200
+    assert response.headers.get("access-control-allow-origin") == "https://policy-pilot-fullstack-5x4y9bbnm-skill-swap12.vercel.app"
+    print("Passed Test 10: PolicyPilot project preview origin allowed.")
+
+
+def test_cors_arbitrary_origin_rejected():
+    print("\n--- Test 11: CORS Arbitrary Origin Rejected ---")
+    bad_headers = {
+        "Origin": "https://evil-unrelated-site.com",
+        "Access-Control-Request-Method": "POST",
+    }
+    response = client.options("/health", headers=bad_headers)
+    # When CORS rejects an origin, FastAPI does not echo access-control-allow-origin
+    assert "access-control-allow-origin" not in response.headers
+
+    # Also test an unrelated vercel app that doesn't match the prefix policy
+    unrelated_vercel = {
+        "Origin": "https://random-unrelated-app.vercel.app",
+        "Access-Control-Request-Method": "POST",
+    }
+    uv_res = client.options("/health", headers=unrelated_vercel)
+    assert "access-control-allow-origin" not in uv_res.headers
+    print("Passed Test 11: Unrelated origins cleanly rejected by CORS.")
+
+
 if __name__ == "__main__":
     print("=" * 60)
     print("RUNNING POLICYPILOT STEP 23 FASTAPI BACKEND TESTS")
@@ -248,6 +301,9 @@ if __name__ == "__main__":
     test_empty_or_whitespace_question_validation()
     test_internal_workflow_error_handling()
     test_model_reuse_across_requests()
+    test_cors_production_origin_allowed()
+    test_cors_preview_origin_allowed()
+    test_cors_arbitrary_origin_rejected()
     print("=" * 60)
     print("ALL STEP 23 FASTAPI BACKEND TESTS PASSED!")
     print("=" * 60)

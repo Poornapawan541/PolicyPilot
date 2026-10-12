@@ -1,23 +1,31 @@
-import json
-import urllib.request
-import urllib.error
+from typing import Optional
 from app.retrieval.citations import CitationFormatter
+from app.core.llm import LLMClient
 
 
 class RAGQuestionAnswerer:
     """
     Generates grounded answers to user questions based strictly on retrieved
-    document evidence using a local Ollama LLM, and formats deterministic citations.
+    document evidence using LLM inference (Groq or local Ollama), and formats deterministic citations.
     """
 
     def __init__(
         self,
-        model_name: str = "llama3:latest",
-        ollama_url: str = "http://localhost:11434/api/generate",
-        citation_formatter: CitationFormatter | None = None,
+        model_name: Optional[str] = None,
+        ollama_url: Optional[str] = None,
+        citation_formatter: Optional[CitationFormatter] = None,
+        provider: Optional[str] = None,
+        groq_api_key: Optional[str] = None,
     ):
-        self.model_name = model_name
-        self.ollama_url = ollama_url
+        self.llm_client = LLMClient(
+            provider=provider,
+            model_name=model_name,
+            ollama_url=ollama_url,
+            groq_api_key=groq_api_key,
+        )
+        self.model_name = self.llm_client.model_name
+        self.ollama_url = self.llm_client.ollama_url
+        self.provider = self.llm_client.provider
         self.citation_formatter = citation_formatter or CitationFormatter()
 
     def build_prompt(self, question: str, retrieved_chunks: list[dict]) -> str:
@@ -67,35 +75,11 @@ ANSWER:"""
         document_name: str = "PolicyPilot Test Enterprise Handbook",
     ) -> str:
         """
-        Sends the grounded prompt to the Ollama HTTP API and returns the generated answer.
+        Sends the grounded prompt to the LLM (Groq or Ollama) and returns the generated answer.
         Maintains backward compatibility with Step 7.
         """
         prompt = self.build_prompt(question, retrieved_chunks)
-
-        payload = {
-            "model": self.model_name,
-            "prompt": prompt,
-            "stream": False,
-            "options": {
-                "temperature": 0.0,
-            },
-        }
-
-        data = json.dumps(payload).encode("utf-8")
-        req = urllib.request.Request(
-            self.ollama_url,
-            data=data,
-            headers={"Content-Type": "application/json"},
-        )
-
-        try:
-            with urllib.request.urlopen(req, timeout=60) as response:
-                if response.status != 200:
-                    raise RuntimeError(f"Ollama returned HTTP status {response.status}")
-                result = json.loads(response.read().decode("utf-8"))
-                return result.get("response", "").strip()
-        except urllib.error.URLError as e:
-            raise RuntimeError(f"Failed to communicate with Ollama at {self.ollama_url}: {e}")
+        return self.llm_client.generate(prompt, json_format=False, temperature=0.0)
 
     def answer_with_citations(
         self,

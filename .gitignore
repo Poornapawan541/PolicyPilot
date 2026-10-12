@@ -4,7 +4,9 @@ __pycache__/
 .env
 .env.*
 !.env.example
-data/documents/
+data/documents/*
+!data/documents/PolicyPilot_Test_Enterprise_Handbook.pdf
+!data/documents/PolicyPilot_Test_Remote_Work_Addendum.pdf
 data/processed/
 node_modules/
 dist/
@@ -14,3 +16,6 @@ frontend/.env
 frontend/.env.*
 !frontend/.env.example
 data/evaluation/
+.vercel
+.vercel
+.env*

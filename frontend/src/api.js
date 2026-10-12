@@ -2,7 +2,29 @@
  * API client service for communicating with the PolicyPilot FastAPI backend.
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+// Priority order for API backend resolution:
+// 1. import.meta.env.VITE_API_BASE_URL (configured in .env or Vercel dashboard)
+// 2. http://localhost:8000 (when developing locally on Vite dev server)
+// 3. Same-origin '' (when deployed on Vercel or production domain serving both frontend & backend)
+const resolveApiBaseUrl = () => {
+  const envUrl = import.meta.env.VITE_API_BASE_URL;
+  if (typeof envUrl === 'string' && envUrl.trim().length > 0) {
+    return envUrl.trim().replace(/\/+$/, '');
+  }
+
+  // Local development check
+  if (
+    typeof window !== 'undefined' &&
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ) {
+    return 'http://localhost:8000';
+  }
+
+  // In production when frontend and backend are deployed together on the same origin
+  return '';
+};
+
+const API_BASE_URL = resolveApiBaseUrl();
 
 /**
  * Checks backend health status.

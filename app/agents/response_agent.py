@@ -1,8 +1,10 @@
 import json
+import os
 import re
 import urllib.request
 import urllib.error
 from typing import Any, Optional
+from app.core.llm import LLMClient
 
 
 class ResponseAgent:
@@ -24,11 +26,20 @@ class ResponseAgent:
 
     def __init__(
         self,
-        model_name: str = "llama3:latest",
-        ollama_url: str = "http://localhost:11434/api/generate",
+        model_name: Optional[str] = None,
+        ollama_url: Optional[str] = None,
+        provider: Optional[str] = None,
+        groq_api_key: Optional[str] = None,
     ):
-        self.model_name = model_name
-        self.ollama_url = ollama_url
+        self.llm_client = LLMClient(
+            provider=provider,
+            model_name=model_name,
+            ollama_url=ollama_url,
+            groq_api_key=groq_api_key,
+        )
+        self.model_name = self.llm_client.model_name
+        self.ollama_url = self.llm_client.ollama_url
+        self.provider = self.llm_client.provider
 
     def build_prompt(
         self,
@@ -74,31 +85,12 @@ Verified Evidence:
 Answer:"""
         return prompt
 
+    def _call_llm(self, prompt: str) -> str:
+        return self.llm_client.generate(prompt, json_format=False, temperature=0.0)
+
     def _call_ollama(self, prompt: str) -> str:
-        payload = {
-            "model": self.model_name,
-            "prompt": prompt,
-            "stream": False,
-            "options": {
-                "temperature": 0.0,
-            },
-        }
-
-        data = json.dumps(payload).encode("utf-8")
-        req = urllib.request.Request(
-            self.ollama_url,
-            data=data,
-            headers={"Content-Type": "application/json"},
-        )
-
-        try:
-            with urllib.request.urlopen(req, timeout=60) as response:
-                if response.status != 200:
-                    raise RuntimeError(f"Ollama returned HTTP status {response.status}")
-                result = json.loads(response.read().decode("utf-8"))
-                return result.get("response", "").strip()
-        except urllib.error.URLError as e:
-            raise RuntimeError(f"Failed to communicate with Ollama at {self.ollama_url}: {e}")
+        """Backward compatible alias for _call_llm."""
+        return self._call_llm(prompt)
 
     def _validate_inputs(
         self,
